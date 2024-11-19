@@ -1,0 +1,678 @@
+package meta;
+
+import java_cup.runtime.Symbol;
+import java.util.ArrayList;
+import java.util.List;
+
+parser code
+{:
+    private List<String> errores = new ArrayList<>();
+    private Symbol s;
+
+    public void syntax_error(Symbol s){
+        this.s = s;
+        String error = String.format("Error sintáctico en línea %d, columna %d: No se esperaba '%s'",
+            s.right, s.left, s.value);
+        errores.add(error);
+        
+    }
+
+    public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception{
+        this.s = s;
+        String error = String.format("Error sintáctico fatal en línea %d, columna %d: No se pudo recuperar del error",
+            s.right, s.left);
+        errores.add(error);
+    }
+
+    public Symbol getS() {
+        return this.s;
+    }
+
+    public List<String> getErrores() {
+        return this.errores;
+    }
+:};
+
+// TERMINALES 
+terminal Break, Case, Char, Const, Continue, Default, Do, Else, For,
+    If, Int, Long, Return, Short, Switch, Void, While, 
+    Incremento, Decremento, Igualdad, MayorIgual, Mayor, MenorIgual, 
+    Menor, Desigualdad, Or, And, Not, Asignacion, Suma, Resta, 
+    Multiplicacion, Division, Modulo, ParentesisA, ParentesisC, 
+    LlaveA, LlaveC, AsignacionSuma, AsignacionResta, AsignacionMultiplicacion,
+    AsignacionDivision, ComaSimple, PuntoComa, DosPuntos, COMENTARIO_NO_FINALIZADO,
+    CARACTER_NO_DEFINIDO, STRING_NO_CERRADO, CHAR_NO_CERRADO, Preprocesador, 
+    Decimal, Octal, Hexadecimal, Flotante, Identificador, Literal, Read, Write, Espacios,
+    Operador, NUMERO_INCOMPLETO, IDENTIFICADOR_INVALIDO, IDENTIFICADOR_NO_VALIDO, Reservada;
+
+// NO TERMINALES
+non terminal INICIO, GLOBAL, FUNCION, DECLARACION, DECLARACION_GLOBAL, DECLARACION_FOR, IF, IF_ELSE, SWITCHPAC, SWITCHLAC,
+    WHILE, DO_WHILE, FOR, SENTENCIA_BOOLEANA, SENTENCIA_FOR, SENTENCIA, SENTENCIA_LIST, CASE_STATEMENT_LIST, EXP_NUMEROS,
+    T_dato, Numero, EXP, Op_relacional, DECLARACION_FUNCIONALES, ReadStatement, WriteStatement, EXP_INT,DFPE, UNIONP,FUNCION_LLAMADA_LIST,
+    PARAMETROS_OPCIONALES, DECLARACION_OPCIONAL, LISTA_PARAMETROS, LISTA_DECLARACIONES, LISTA_EXPRESIONES,LLAVESCASEAYC,
+    LISTA_PFUNCION, DECLARACION_PFUNCION, CUERPO_FUNCION, SWITCH_STATEMENT, CASE_STATEMENT,EXP_BOOLEANA, DEFAULT_STATEMENT, 
+    BREAK_STATEMENT, CONTINUE_STATEMENT, RETURN_STATEMENT, LISTA_IDENTIFICADORES, LISTA_EXPRESIONES_ERROR, PREPROCESADORES, ERROR_DEFAULT,
+    LIERROR, PARENTESISDEAYC, LLAVESAYC, TIPADOF, ICPYC, FUNCIONSIMPLE, LISTAEXP, FUNCION_LLAMADA, PARENTESISDEAYCF, ELSE, VAR_IDENT, FUNC_IDENT;
+
+// PRECEDENCIA
+precedence left Or;
+precedence left And;
+precedence nonassoc Igualdad, Desigualdad;
+precedence nonassoc Mayor, Menor, MayorIgual, MenorIgual;
+precedence left Suma, Resta,AsignacionSuma, AsignacionResta;
+precedence left Multiplicacion, Division, Modulo, AsignacionMultiplicacion, AsignacionDivision;
+precedence right Not;
+//precedence left ParentesisA, Identificador;
+precedence left If, Else;
+precedence left PuntoComa;
+
+start with INICIO;
+
+// Definición de tipos de datos
+T_dato ::= Int | Short | Char;
+
+Numero ::= Decimal | Flotante | Hexadecimal | Octal;
+
+Op_relacional ::= Igualdad | MayorIgual | Mayor | MenorIgual | Menor | Desigualdad;
+
+UNIONP ::= LISTA_PFUNCION 
+
+;
+
+PARENTESISDEAYC ::= 
+    ParentesisA UNIONP ParentesisC 
+    |ParentesisA ParentesisC 
+    |ParentesisA UNIONP error {: parser.syntax_error(cur_token); parser.report_error("Error en parametros \n", cur_token); :} 
+    |ParentesisA error {: parser.syntax_error(cur_token); parser.report_error("Error en parametros \n", cur_token); :} 
+    |ParentesisC UNIONP error {: parser.syntax_error(cur_token); parser.report_error("Error en parametros \n", cur_token); :} 
+    |ParentesisC error {: parser.syntax_error(cur_token); parser.report_error("Error en parametros \n", cur_token); :} 
+    |UNIONP ParentesisA error {: parser.syntax_error(cur_token); parser.report_error("Error en parametros \n", cur_token); :} 
+    |UNIONP ParentesisC error {: parser.syntax_error(cur_token); parser.report_error("Error en parametros \n", cur_token); :}
+    
+;
+LLAVESAYC ::= 
+    LlaveA SENTENCIA LlaveC |
+    LlaveA LlaveC |
+    LlaveA SENTENCIA error {: parser.syntax_error(cur_token); parser.report_error("Falta llave de cierre en el bloque \n", null); :} |
+    LlaveA error {: parser.syntax_error(cur_token); parser.report_error("Falta llave de cierre en el bloque \n", null); :} |
+    LlaveC SENTENCIA error {: parser.syntax_error(cur_token); parser.report_error("Falta llave de cierre en el bloque \n", null); :} |
+    LlaveC error {: parser.syntax_error(cur_token); parser.report_error("Falta llave de cierre en el bloque \n", null); :} |
+    SENTENCIA LlaveC error {: parser.syntax_error(cur_token); parser.report_error("Falta llave de cierre en el bloque \n", null); :} |
+    SENTENCIA LlaveA error {: parser.syntax_error(cur_token); parser.report_error("Falta llave de cierre en el bloque \n", null); :} |
+    SENTENCIA error {: parser.syntax_error(cur_token); parser.report_error("Faltan llaves en el bloque \n", null); :};
+
+INICIO ::= GLOBAL FUNCION | FUNCION | FUNCION GLOBAL error {: parser.syntax_error(cur_token); parser.report_error("No se pueden declarar variables fdf\n", null); :};
+
+GLOBAL ::= GLOBAL DECLARACION_GLOBAL | DECLARACION_GLOBAL;
+
+DECLARACION_GLOBAL ::= 
+    T_dato LISTA_IDENTIFICADORES PuntoComa |
+    Long LISTA_IDENTIFICADORES PuntoComa |
+    Long Long LISTA_IDENTIFICADORES PuntoComa |
+
+    T_dato LISTA_IDENTIFICADORES Asignacion EXP PuntoComa |
+    Const T_dato LISTA_IDENTIFICADORES Asignacion EXP PuntoComa |
+    Long T_dato LISTA_IDENTIFICADORES Asignacion EXP PuntoComa |
+    Long LISTA_IDENTIFICADORES Asignacion EXP PuntoComa |
+    Long Long T_dato LISTA_IDENTIFICADORES Asignacion EXP PuntoComa |
+    Long Long LISTA_IDENTIFICADORES Asignacion EXP PuntoComa |
+
+// ---------------------Errores con void -----------------------------------------------------------
+    Void LISTA_IDENTIFICADORES PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar variables tipo Void \n", null); :} |   
+    Long Void LISTA_IDENTIFICADORES PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar variables long tipo Void \n", null); :} |
+    Long Long Void LISTA_IDENTIFICADORES PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar variables long tipo Void \n", null); :} |
+    Void LISTA_IDENTIFICADORES Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar variables con void \n", null); :} |
+    Const Void LISTA_IDENTIFICADORES Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar const con void \n", null); :} |
+    Long Void LISTA_IDENTIFICADORES Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar variables long con void \n", null); :} |
+    Long Long Void LISTA_IDENTIFICADORES Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar variables long long con void \n", null); :} |
+    
+
+// --------------------Otros erroes ----------------------------------------------------------------
+
+    T_dato LISTA_IDENTIFICADORES error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en declaración global \n", null); :} |
+    Long LISTA_IDENTIFICADORES error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en declaración global \n", null); :} |
+    Long Long LISTA_IDENTIFICADORES error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en declaración global \n", null); :} |
+    
+    T_dato LISTA_IDENTIFICADORES Asignacion EXP error {: parser.syntax_error(cur_token); parser.report_error("Hubo error de sintaxis1 \n", null); :} |
+    Long LISTA_IDENTIFICADORES Asignacion EXP error {: parser.syntax_error(cur_token); parser.report_error("Hubo error de sintaxis2 \n", null); :} |
+    Long Long LISTA_IDENTIFICADORES Asignacion EXP error {: parser.syntax_error(cur_token); parser.report_error("Hubo error de sintaxis3 \n", null); :} |
+    Const T_dato LISTA_IDENTIFICADORES Asignacion EXP error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en declaración global \n", null); :} |
+    LISTA_IDENTIFICADORES Asignacion EXP PuntoComa  error{: parser.syntax_error(cur_token); parser.report_error("Falta tipo de dato \n", null); :} |
+
+    Const LISTA_IDENTIFICADORES Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta tipo de dato \n", null); :} |
+    T_dato Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta el identificador \n", null); :} |
+    Long Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta el identificador \n", null); :} |
+    Long Long Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta el identificador \n", null); :} |
+    Const T_dato Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta el identificador \n", null); :} |
+
+    T_dato LISTA_IDENTIFICADORES Asignacion PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta la expresion \n", null); :} |
+    Long LISTA_IDENTIFICADORES Asignacion PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta la expresion \n", null); :} |
+    Long Long LISTA_IDENTIFICADORES Asignacion PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta la expresion \n", null); :} |
+    Const T_dato LISTA_IDENTIFICADORES Asignacion PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta la expresion \n", null); :} |
+
+    T_dato LISTA_IDENTIFICADORES EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta la asignacion \n", null); :} |
+    Long LISTA_IDENTIFICADORES EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta la asignacion \n", null); :} |
+    Long Long LISTA_IDENTIFICADORES EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta la asignacion \n", null); :} |
+    Const T_dato LISTA_IDENTIFICADORES EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta la asignacion \n", null); :} | 
+
+    EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta la declaracion en variable global \n", null); :} |
+    PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("No se esperaba un ; fuera de una funcion \n", null); :} |
+    Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta el identificador \n", null); :} | 
+    LISTA_IDENTIFICADORES  error {: parser.syntax_error(cur_token); parser.report_error("Falta la asignacion de este identificador  \n", null); :} |
+
+    error T_dato {: parser.syntax_error(cur_token); parser.report_error("Falta el identificador  \n", null); :} |
+    error Long {: parser.syntax_error(cur_token); parser.report_error("Falta el identificador  \n", null); :} |
+    error Const {: parser.syntax_error(cur_token); parser.report_error("Falta el tipo de dato \n", null); :} |
+    Const T_dato error  {: parser.syntax_error(cur_token); parser.report_error("Falta el identificador, asignacion exp y puntoComa \n", null); :} |
+    Const Void error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar variables const con void \n", null); :} |
+    Void error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar variables void\n", null); :} |
+    Void PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("No se puede declarar un tipo con punto y coma \n", null); :}  
+  ;
+
+DFPE ::= DFPE VAR_IDENT ComaSimple error {: parser.syntax_error(cur_token); parser.report_error("Al parámetro introducido le falta el tipo de dato \n", null); :} 
+       | VAR_IDENT error {: parser.syntax_error(cur_token); parser.report_error("Al parámetro introducido le falta el tipo de dato \n", null); :} ;
+
+FUNCION ::= 
+    FUNCION T_dato LISTA_IDENTIFICADORES PARENTESISDEAYC LLAVESAYC |
+    FUNCION Void LISTA_IDENTIFICADORES PARENTESISDEAYC LLAVESAYC |
+    FUNCION Long LISTA_IDENTIFICADORES PARENTESISDEAYC LLAVESAYC |
+    
+    T_dato LISTA_IDENTIFICADORES PARENTESISDEAYC LLAVESAYC |
+    Void LISTA_IDENTIFICADORES PARENTESISDEAYC LLAVESAYC |
+    Long LISTA_IDENTIFICADORES PARENTESISDEAYC LLAVESAYC |
+
+     T_dato LISTA_IDENTIFICADORES LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Parentesis parametros \n", null); :} |
+    Void LISTA_IDENTIFICADORES LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Parentesis parametros \n", null); :} |
+    Long LISTA_IDENTIFICADORES LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Parentesis parametros \n", null); :} |
+
+    T_dato LISTA_IDENTIFICADORES PARENTESISDEAYC error {: parser.syntax_error(cur_token); parser.report_error("Llaves \n", null); :} |
+    Void LISTA_IDENTIFICADORES PARENTESISDEAYC error {: parser.syntax_error(cur_token); parser.report_error("Llaves \n", null); :} |
+    Long LISTA_IDENTIFICADORES PARENTESISDEAYC error {: parser.syntax_error(cur_token); parser.report_error("Llaves \n", null); :} |
+    FUNCION error LISTA_IDENTIFICADORES PARENTESISDEAYC LLAVESAYC  {: parser.syntax_error(cur_token); parser.report_error("Falta tipo \n", null); :} |
+    error LISTA_IDENTIFICADORES PARENTESISDEAYC LLAVESAYC  {: parser.syntax_error(cur_token); parser.report_error("Falta tipo \n", null); :} ;
+    
+// Definición de la lista de expresiones para write
+
+ReadStatement ::= 
+    Read ParentesisA LISTA_IDENTIFICADORES ParentesisC PuntoComa |
+    Read ParentesisA ParentesisC PuntoComa |
+    Read PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Faltan parentesis y su expresion  \n", null); :} |
+    Read ParentesisA LISTA_IDENTIFICADORES error {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de paréntesis o presenta caracteres invalidos en sentencia read \n", null); :} |
+    Read ParentesisA error {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de paréntesis o presenta caracteres invalidos en sentencia read \n", null); :} |
+    Read ParentesisA LISTA_IDENTIFICADORES ParentesisC error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en sentencia read \n", null); :} |
+    Read ParentesisA ParentesisC error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en sentencia read \n", null); :}
+;
+
+WriteStatement ::=
+    
+    Write ParentesisA LISTA_EXPRESIONES ParentesisC PuntoComa |
+    Write ParentesisA LISTA_EXPRESIONES ParentesisC error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en sentencia write \n", null); :} |
+    Write ParentesisA LISTA_EXPRESIONES error {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de paréntesis en sentencia write \n", null); :} |
+    Write ParentesisA ParentesisC PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Falta un parametro en sentencia Write \n", null); :} |
+    Write ParentesisA ParentesisC error {: parser.syntax_error(cur_token); parser.report_error("Falta un parametro en Sentencia Write \n", null); :} |
+    Write ParentesisA error {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de parentesis en Sentencia Write \n", null); :} |
+    Write error PuntoComa  {: parser.syntax_error(cur_token); parser.report_error("No se le han definido los parametros a la funcion Write \n", null); :}
+;
+
+LISTA_EXPRESIONES ::= 
+    EXP |
+    EXP ComaSimple LISTA_EXPRESIONES |
+    EXP LISTA_EXPRESIONES error {: parser.syntax_error(cur_token); parser.report_error("Falta coma simple en sentencia de parámetros \n", null); :}|
+ComaSimple error {: parser.syntax_error(cur_token); parser.report_error("Se esperaba una expresion \n", null); :}
+;
+
+FUNCION_LLAMADA ::= FUNC_IDENT ;
+
+CUERPO_FUNCION ::= LISTA_DECLARACIONES | SENTENCIA | LISTA_DECLARACIONES SENTENCIA;
+
+LISTA_IDENTIFICADORES ::= VAR_IDENT ComaSimple LISTA_IDENTIFICADORES | VAR_IDENT;
+
+LISTA_DECLARACIONES ::= LISTA_DECLARACIONES DECLARACION | DECLARACION;
+
+LISTA_PFUNCION ::= 
+    DECLARACION_PFUNCION 
+    | DECLARACION_PFUNCION ComaSimple LISTA_PFUNCION 
+    |error ComaSimple LISTA_PFUNCION {: parser.syntax_error(cur_token); parser.report_error("No se definieron los parámetros de la función \n", null); :}
+    |  EXP ComaSimple LISTA_PFUNCION{: parser.syntax_error(cur_token); parser.report_error("Parametro no esperado \n", null); :} 
+    | EXP error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | IF ComaSimple error LISTA_PFUNCION  {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | error IF {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | IF_ELSE ComaSimple error LISTA_PFUNCION  {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | error IF_ELSE {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | ELSE ComaSimple error LISTA_PFUNCION  {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | error ELSE {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | WHILE ComaSimple LISTA_PFUNCION  {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | FOR ComaSimple  LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | SWITCH_STATEMENT ComaSimple LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | BREAK_STATEMENT ComaSimple LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | DEFAULT_STATEMENT ComaSimple LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | CASE_STATEMENT ComaSimple LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | CONTINUE_STATEMENT ComaSimple LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | RETURN_STATEMENT ComaSimple LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | DO_WHILE ComaSimple LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | ReadStatement ComaSimple LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    | WriteStatement ComaSimple LISTA_PFUNCION error {: parser.syntax_error(cur_token); parser.report_error(" Parametro no esperado \n", null); :}
+    
+;
+    
+DECLARACION_PFUNCION ::= T_dato VAR_IDENT
+                        | T_dato error {: parser.syntax_error(cur_token); parser.report_error("Falta el identificador  del tipo de dato en parametros de la funcion  \n", null); :};
+
+
+SENTENCIA ::=
+    
+    SENTENCIA DECLARACION |
+    DECLARACION |
+    SENTENCIA IF |
+    IF |
+    SENTENCIA IF_ELSE |
+    IF_ELSE |
+    SENTENCIA WHILE |
+    WHILE |
+    SENTENCIA DO_WHILE |
+    DO_WHILE |
+    SENTENCIA FOR |
+    FOR |
+    SENTENCIA ReadStatement |
+    ReadStatement |
+    SENTENCIA WriteStatement |
+    WriteStatement |
+    SENTENCIA SWITCH_STATEMENT |
+    SWITCH_STATEMENT |
+    SENTENCIA BREAK_STATEMENT |
+    BREAK_STATEMENT |
+    SENTENCIA CONTINUE_STATEMENT |
+    CONTINUE_STATEMENT |
+    SENTENCIA RETURN_STATEMENT |
+    RETURN_STATEMENT |
+    SENTENCIA ELSE |
+    ELSE 
+      ;
+
+FUNCION_LLAMADA_LIST ::=
+FUNCION_LLAMADA PuntoComa %prec PuntoComa 
+;
+SENTENCIA_BOOLEANA ::= 
+    EXP
+;
+
+DECLARACION ::= 
+    Const T_dato LISTA_IDENTIFICADORES Asignacion EXP PuntoComa |
+    Long T_dato LISTA_IDENTIFICADORES Asignacion EXP PuntoComa |
+    Long Long T_dato LISTA_IDENTIFICADORES Asignacion EXP PuntoComa |
+    T_dato VAR_IDENT PuntoComa |
+    Const T_dato VAR_IDENT PuntoComa |
+    Long VAR_IDENT PuntoComa |
+    Long Long VAR_IDENT PuntoComa |
+    Long T_dato VAR_IDENT PuntoComa |
+    Long Long T_dato VAR_IDENT PuntoComa |
+    FUNCION_LLAMADA_LIST  |
+    T_dato VAR_IDENT Asignacion EXP PuntoComa |
+    Long VAR_IDENT Asignacion EXP PuntoComa |
+    Long Long VAR_IDENT Asignacion EXP PuntoComa |
+   
+    T_dato VAR_IDENT Incremento PuntoComa |
+    VAR_IDENT AsignacionSuma EXP PuntoComa |
+    VAR_IDENT AsignacionResta EXP PuntoComa|
+    VAR_IDENT AsignacionMultiplicacion EXP PuntoComa |
+    VAR_IDENT AsignacionDivision EXP PuntoComa |
+    VAR_IDENT Incremento PuntoComa |
+    VAR_IDENT Decremento PuntoComa |
+    VAR_IDENT Asignacion EXP PuntoComa|
+    T_dato VAR_IDENT error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en declaración local \n", null); :} |
+    T_dato VAR_IDENT Asignacion EXP error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en declaración \n", null); :} |
+    T_dato VAR_IDENT Incremento error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en declaración \n", null); :} |
+    T_dato Incremento VAR_IDENT error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en declaración \n", null); :} |
+    VAR_IDENT Asignacion EXP error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en declaración \n", null); :} |
+    EXP error PuntoComa   {: parser.syntax_error(cur_token); parser.report_error("Falta tipo de dato en declaracion local \n", null); :} | 
+    Const Void LISTA_IDENTIFICADORES Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("Void en constante \n", null); :} |
+    Void VAR_IDENT PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("void en identificador \n", null); :} |
+    Void VAR_IDENT Asignacion EXP PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("void en asignacion \n", null); :} |
+    Void VAR_IDENT Incremento PuntoComa error {: parser.syntax_error(cur_token); parser.report_error("void en incremento \n", null); :}
+   ;
+
+EXP ::= 
+    EXP Suma EXP |
+    EXP Resta EXP |
+    EXP Multiplicacion EXP |
+    EXP Division EXP |
+    EXP Modulo EXP |
+    EXP And EXP |
+    EXP Or EXP |
+    Not EXP |
+    EXP Op_relacional EXP |
+     FUNCION_LLAMADA |
+    VAR_IDENT |
+    Numero |
+    Literal
+    EXP Suma error {: parser.syntax_error(cur_token); parser.report_error("tipo de expresion invalida \n", null); :} | 
+    EXP Resta error {: parser.syntax_error(cur_token); parser.report_error("tipo de expresion invalida \n", null); :} |
+    EXP Multiplicacion error {: parser.syntax_error(cur_token); parser.report_error("tipo de expresion invalida \n", null); :} |
+    EXP Division error {: parser.syntax_error(cur_token); parser.report_error("tipo de expresion invalida \n", null); :} |
+    EXP Modulo error {: parser.syntax_error(cur_token); parser.report_error("tipo de expresion invalida \n", null); :} |
+    EXP And error {: parser.syntax_error(cur_token); parser.report_error("tipo de expresion invalida \n", null); :} |
+    EXP Or error {: parser.syntax_error(cur_token); parser.report_error("tipo de expresion invalida \n", null); :} |
+    Not error {: parser.syntax_error(cur_token); parser.report_error("tipo de expresion invalida \n", null); :} |
+    EXP Op_relacional error {: parser.syntax_error(cur_token); parser.report_error("tipo de expresion invalida \n", null); :} 
+  
+;
+
+FUNCIONSIMPLE ::= Identificador ParentesisA EXP ParentesisC | LISTA_IDENTIFICADORES;
+
+VAR_IDENT ::= Identificador;
+FUNC_IDENT ::= Identificador ParentesisA LISTA_EXPRESIONES ParentesisC 
+    | Identificador ParentesisA ParentesisC
+    | Identificador ParentesisA error {: parser.syntax_error(cur_token); parser.report_error("Falta parentesisC en funcion_llamada \n", null); :}
+     
+;
+                
+// Estructuras de control
+IF ::= 
+    If ParentesisA SENTENCIA_BOOLEANA ParentesisC LLAVESAYC |
+    If ParentesisA SENTENCIA_BOOLEANA LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de paréntesis en if \n", null); :} |
+    If ParentesisA SENTENCIA_BOOLEANA ParentesisC error {: parser.syntax_error(cur_token); parser.report_error("Faltan corchetes en if \n", null); :} |
+    If ParentesisA error ParentesisC LLAVESAYC  {: parser.syntax_error(cur_token); parser.report_error("Falta expresion en el if \n", null); :}|
+    If ParentesisA LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n", cur_token); :} |
+    If ParentesisC SENTENCIA_BOOLEANA LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n", cur_token); :} |
+    If ParentesisC LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n", cur_token); :} | 
+    If  SENTENCIA_BOOLEANA error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis en expresion \n", cur_token); :} |
+    If  SENTENCIA_BOOLEANA  LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis en expresion \n", cur_token); :}
+   ;
+  
+IF_ELSE ::= 
+     If ParentesisA SENTENCIA_BOOLEANA ParentesisC LLAVESAYC Else LLAVESAYC |
+    If ParentesisA SENTENCIA_BOOLEANA  LLAVESAYC Else LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de paréntesis en if \n", null); :} |
+    If ParentesisA SENTENCIA_BOOLEANA ParentesisC Else LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Faltan corchetes en if \n", null); :} |
+    If ParentesisA ParentesisC LLAVESAYC Else LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta expresion en el if \n", null); :} |
+    //If ParentesisA SENTENCIA_BOOLEANA LLAVESAYC Else LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n",cur_token); :} |
+    If ParentesisA LLAVESAYC error Else LLAVESAYC {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n", cur_token); :} |
+    If ParentesisC SENTENCIA_BOOLEANA LLAVESAYC Else LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n", cur_token); :} |
+    If ParentesisC LLAVESAYC Else LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n", cur_token); :} |
+    If error SENTENCIA_BOOLEANA ParentesisC LLAVESAYC Else LLAVESAYC error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n",cur_token); :} |
+     If ParentesisA SENTENCIA_BOOLEANA ParentesisC LLAVESAYC Else error {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n",cur_token); :} |
+     If error SENTENCIA_BOOLEANA LLAVESAYC ELSE LLAVESAYC  {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis  en parámetros \n",cur_token); :} 
+;
+ ELSE ::=
+    Else error ParentesisA ParentesisC  {: parser.syntax_error(cur_token); parser.report_error("Falta paréntesis de cierre en parámetros \n",cur_token); :} |
+     Else error LLAVESAYC  {: parser.syntax_error(cur_token); parser.report_error("No se permite else sin if \n",cur_token); :} 
+  
+         
+;
+
+WHILE ::= 
+    // Casos correctos
+    While ParentesisA SENTENCIA_BOOLEANA ParentesisC LLAVESAYC |
+   
+    
+    // Errores en la estructura del while
+    While error LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la estructura del while - verifique paréntesis y condición\n", null); 
+    :} |
+    While ParentesisA error LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la condición del while\n", null); 
+    :} |
+    While error ParentesisC LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en el bloque del while - verifique las llaves\n", null); 
+    :} |
+    While error SENTENCIA_BOOLEANA ParentesisC LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en el bloque del while - verifique las llaves\n", null); 
+    :} |
+
+    While ParentesisA SENTENCIA_BOOLEANA error LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en el bloque del while - verifique las llaves\n", null); 
+    :} 
+;
+
+DO_WHILE ::= 
+    // Casos correctos
+    Do LLAVESAYC While ParentesisA SENTENCIA_BOOLEANA ParentesisC PuntoComa |
+    
+    // Errores en la primera parte (Do)
+    Do error While ParentesisA SENTENCIA_BOOLEANA ParentesisC PuntoComa {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en el bloque do - verifique las llaves\n", null); 
+    :} |
+    
+    // Errores en la segunda parte (While)
+    Do LLAVESAYC While error PuntoComa {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la condición del while\n", null); 
+    :} |
+    
+    // Error en el cierre de la sentencia
+    Do LLAVESAYC While ParentesisA SENTENCIA_BOOLEANA ParentesisC error {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la terminación del do-while - falta punto y coma\n", null);
+    :} |
+    
+        Do LLAVESAYC While error SENTENCIA_BOOLEANA  ParentesisC PuntoComa {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la terminación del do-while - falta parentesis Apertura\n", null); 
+    :} |
+    
+    Do LLAVESAYC While ParentesisA  SENTENCIA_BOOLEANA error PuntoComa {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la terminación del do-while - falta parentesis Apertura\n", null); 
+    :} |
+
+        Do LLAVESAYC While error  ParentesisC PuntoComa {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la terminación del do-while - falta parentesis Apertura\n", null); 
+    :} |
+    
+    Do LLAVESAYC While error ParentesisA  PuntoComa {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la terminación del do-while - falta parentesis Apertura\n", null); 
+    :} |
+    
+    Do LLAVESAYC While ParentesisA  error  {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la terminación del do-while - falta parentesis Apertura\n", null); 
+    :} |
+
+    Do LLAVESAYC While ParentesisC  error  {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la terminación del do-while - falta parentesis Apertura\n", null); 
+    :} 
+    
+  
+    
+;
+
+FOR ::= 
+    // Casos correctos
+    For ParentesisA SENTENCIA_FOR ParentesisC LLAVESAYC 
+|   For error LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la estructura del for - verifique paréntesis y componentes\n", null); 
+    :}
+|   For ParentesisA error ParentesisC LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en las expresiones del for\n", null); 
+    :} 
+|   For error ParentesisC LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en las expresiones del for\n", null); 
+    :}
+|   For ParentesisA error LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en las expresiones del for\n", null); 
+    :}
+|   For SENTENCIA_FOR error ParentesisC LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en las expresiones del for\n", null); 
+    :}
+|   For ParentesisA SENTENCIA_FOR error LLAVESAYC {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en las expresiones del for\n", null); 
+    :}
+|   For ParentesisA SENTENCIA_FOR ParentesisC error {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en el bloque del for - verifique las llaves\n", null); 
+    :}
+;
+
+SENTENCIA_FOR ::= 
+    T_dato VAR_IDENT Asignacion EXP PuntoComa EXP_BOOLEANA PuntoComa DECLARACION_FOR
+|   VAR_IDENT Asignacion EXP PuntoComa EXP_BOOLEANA PuntoComa DECLARACION_FOR
+
+   // Errores en la inicialización
+|    T_dato VAR_IDENT error EXP_BOOLEANA PuntoComa DECLARACION_FOR {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la inicialización del for", null); 
+    :} 
+    
+    // Errores en la condición
+|    T_dato VAR_IDENT Asignacion EXP PuntoComa error PuntoComa DECLARACION_FOR {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en la condición del for", null); 
+    :} 
+    
+    // Errores en el incremento/decremento
+|    T_dato VAR_IDENT Asignacion EXP PuntoComa EXP_BOOLEANA PuntoComa error {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en el incremento/decremento del for", null); 
+    :}
+   
+;
+
+DECLARACION_FOR ::= 
+    VAR_IDENT Asignacion EXP
+  | VAR_IDENT Incremento
+  | Incremento VAR_IDENT
+  | VAR_IDENT Decremento
+  | Decremento VAR_IDENT
+  | VAR_IDENT error {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error debe de poseer un incrementador", null); 
+    :}
+   
+;
+SWITCHPAC ::=
+   ParentesisA EXP_INT ParentesisC
+|   ParentesisA error ParentesisC {: parser.syntax_error(cur_token); parser.report_error("No pude dejarse vacio el parametro a validar \n", null); :}
+|   ParentesisA EXP_INT  error {: parser.syntax_error(cur_token); parser.report_error("Falta parentesis de parametro \n", null); :}
+|   ParentesisC EXP_INT  error {: parser.syntax_error(cur_token); parser.report_error("Falta parentesis de parametro \n", null); :}
+|    EXP_INT error ParentesisC {: parser.syntax_error(cur_token); parser.report_error("Falta parentesis de parametro \n", null); :}
+|   ParentesisA error {: parser.syntax_error(cur_token); parser.report_error("Falta parentesis de parametro \n", null); :}
+|   ParentesisC error {: parser.syntax_error(cur_token); parser.report_error("Falta parentesis de parametro \n", null); :}
+
+;
+
+SWITCHLAC ::=
+LlaveA CASE_STATEMENT_LIST  LlaveC 
+|   LlaveA CASE_STATEMENT_LIST DEFAULT_STATEMENT ERROR_DEFAULT  LlaveC 
+|   LlaveA DEFAULT_STATEMENT ERROR_DEFAULT LlaveC 
+|   LlaveA CASE_STATEMENT_LIST DEFAULT_STATEMENT LlaveC
+|   LlaveA LlaveC 
+|   LlaveA DEFAULT_STATEMENT LlaveC
+
+// Errores caso 1
+|   error CASE_STATEMENT_LIST LlaveC  {: parser.syntax_error(cur_token); parser.report_error("Falta llave apertura en switch \n", null); :}
+|   LlaveA CASE_STATEMENT_LIST error {: parser.syntax_error(cur_token); parser.report_error("Falta llave de cierre en switch \n", null); :}
+
+// Errores caso 2
+
+|   LlaveA CASE_STATEMENT_LIST DEFAULT_STATEMENT error {: parser.syntax_error(cur_token); parser.report_error("Falta llave de cierre en switch con case y default \n", null); :}
+|   error CASE_STATEMENT_LIST DEFAULT_STATEMENT LlaveC {: parser.syntax_error(cur_token); parser.report_error("Falta llave de apertura en switch con case y default \n", null); :}
+
+// Errores caso 3
+|   LlaveA error {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de paréntesis en switch \n", null); :}
+
+|   LlaveC error {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de paréntesis en switch \n", null); :}
+
+// Errores caso 4
+|   error DEFAULT_STATEMENT LlaveC  {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de paréntesis en switch \n", null); :}
+|   LlaveA DEFAULT_STATEMENT error {: parser.syntax_error(cur_token); parser.report_error("Falta cierre de paréntesis en switch \n", null); :}
+
+;
+
+SWITCH_STATEMENT ::= 
+    Switch SWITCHPAC SWITCHLAC 
+|   Switch error SWITCHLAC   {: parser.syntax_error(cur_token); parser.report_error("Falta llaves en switch \n", null); :}
+|   Switch error SWITCHPAC   {: parser.syntax_error(cur_token); parser.report_error("Falta Parentesis en switch \n", null); :}
+;
+
+// Sentencia específica para el 'for'
+CASE_STATEMENT_LIST ::= 
+    CASE_STATEMENT |
+    CASE_STATEMENT CASE_STATEMENT_LIST 
+;
+
+CASE_STATEMENT ::= 
+    Case EXP_NUMEROS DosPuntos LlaveA SENTENCIA LlaveC
+|   Case EXP_NUMEROS DosPuntos SENTENCIA 
+|   Case EXP_NUMEROS DosPuntos PuntoComa
+|   Case EXP_NUMEROS error LlaveA SENTENCIA LlaveC {: parser.syntax_error(cur_token); parser.report_error("Faltan 2 puntos en el case \n", null); :}
+|   Case EXP_NUMEROS LlaveA SENTENCIA error {: parser.syntax_error(cur_token); parser.report_error("Falta llave de cierre en el case \n", null); :}
+|   Case EXP_NUMEROS error SENTENCIA LlaveC {: parser.syntax_error(cur_token); parser.report_error("Falta llave de apertura en el case \n", null); :}
+|   Case EXP_NUMEROS LlaveA error LlaveC {: parser.syntax_error(cur_token); parser.report_error("Falta sentencia en el case \n", null); :}
+|   Case EXP_NUMEROS DosPuntos error {: parser.syntax_error(cur_token); parser.report_error("Falta sentencia o punto y coma en case \n", null); :}
+|   Case error {: parser.syntax_error(cur_token); parser.report_error("Mal uso de sintaxis case revise su codigo \n", null); :}
+|   Case DosPuntos error {: parser.syntax_error(cur_token); parser.report_error("Mal uso de sintaxis case revise su codigo \n", null); :}
+;
+
+DEFAULT_STATEMENT ::=
+    Default DosPuntos SENTENCIA  |
+    Default DosPuntos LlaveA SENTENCIA LlaveC |
+    Default DosPuntos error SENTENCIA LlaveC  {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Falta llave de apertura \n", null); 
+    :} |
+    Default DosPuntos  LlaveA SENTENCIA error {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Falta llave de cierre \n", null); 
+    :} |
+    Default DosPuntos LlaveA LlaveC error{: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Falta sentencia \n", null); 
+    :} |
+    
+    Default DosPuntos error {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error en el cuerpo del default - sentencia inválida \n", null); 
+    :} |
+    Default error SENTENCIA PuntoComa {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Faltan dos puntos después de default \n", null); 
+    :} |
+    Default error {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Estructura incorrecta en default - revise la sintaxis \n", null); 
+    :}
+;
+ 
+BREAK_STATEMENT ::= 
+    Break PuntoComa |
+    Break error {: 
+        parser.syntax_error(cur_token); 
+        parser.report_error("Error: Falta punto y coma después del break \n", null); 
+    :}
+;
+CONTINUE_STATEMENT ::= 
+    Continue PuntoComa |
+    Continue error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en sentencia continue\n", null); :}
+;
+
+RETURN_STATEMENT ::= 
+    Return PuntoComa |
+    Return EXP PuntoComa |
+    Return error {: parser.syntax_error(cur_token); parser.report_error("Falta punto y coma en sentencia return \n", null); :}
+;
+
+EXP_INT ::= 
+    Decimal | Octal | Hexadecimal | Identificador 
+;
+EXP_NUMEROS ::= 
+            Decimal | Hexadecimal | Octal
+;
+EXP_BOOLEANA ::= SENTENCIA_BOOLEANA ;
+
+ERROR_DEFAULT ::= ERROR_DEFAULT DEFAULT_STATEMENT error {: parser.syntax_error(cur_token); parser.report_error("No se permite mas de un default en el switch \n", null); :}
+ | DEFAULT_STATEMENT {: parser.syntax_error(cur_token); parser.report_error("No se permite mas de un default en el switch \n", null); :}
+;
